@@ -1,6 +1,122 @@
 # Multi-Class-IDS
 
+# A simple instantiation of the quantum layer
+
+```
+class CosineQuantumLayer(nn.Module):
+    """Fast surrogate for the Ry+CNOT ring producing ⟨Z_i⟩."""
+    def __init__(self, n_qubits):
+        super().__init__()
+        self.scale = nn.Parameter(torch.ones(n_qubits) * torch.pi)
+
+    def forward(self, data):            # data : (B, n_qubits)
+        return torch.cos(self.scale * data)   # (B, n_qubits)
+class HybridSideBySideFastNN(nn.Module):
+    def __init__(self, input_dim, num_classes, n_qubits=8):
+        super().__init__()
+        self.classical = nn.Sequential(
+            nn.Linear(input_dim, 64), nn.ReLU(),
+            nn.Linear(64, 32),        nn.ReLU(),
+            nn.Linear(32, 16),        nn.ReLU()
+        )
+        self.q_compress = nn.Linear(16, n_qubits)     # 16 → 8
+        self.q_layer    = CosineQuantumLayer(n_qubits)
+
+        self.output = nn.Sequential(
+            nn.Linear(n_qubits + 16, 16), nn.ReLU(),
+            nn.Linear(16, num_classes)
+        )
+
+    def forward(self, x):                          # x : (B, input_dim)
+        x_emb  = self.classical(x)                 # (B, 16)
+        q_in   = self.q_compress(x_emb)            # (B, 8)
+        z_exp  = self.q_layer(q_in)                # (B, 8)
+
+        features = torch.cat([x_emb, z_exp], dim=1)  # (B, 24)
+        return self.output(features)
+```
+
+
+This instantiates this quantum circuit
+![image](https://github.com/user-attachments/assets/2da1c347-b594-45d0-8bef-a79b018b8d98)
+
+
+and it gives us these results.
+
+Epoch 30/30
+100%
+ 1934/1934 [00:21<00:00, 69.24it/s]
+✅  New best model (val AUC 0.9989)
+Val Acc: 0.9954 | Prec: 0.7708 | Rec: 0.6902 | F1: 0.7021
+Test Acc: 0.9953 | Prec: 0.8404 | Rec: 0.6767 | F1: 0.7095
+Test Classification Report:
+|   class        |   precision |    recall |  f1-score |   support |
+| --- | --- | --- | --- | --- |
+|           0 |    0.9972 |   0.9971  |  0.9971  |  340611 |
+|           1 |    0.9923 |   0.9959  |  0.9941  |   23694 |
+|           2 |    0.9286 |   0.1193  |  0.2114  |     218 |
+|           3 |    0.0000 |   0.0000  |  0.0000  |     128 |
+|           4 |    0.0000 |   0.0000  |  0.0000  |       3 |
+|           5 |    0.9949 |   0.9898  |  0.9923  |    1176 |
+|           6 |    0.9623 |   0.9841  |  0.9731  |     881 |
+|           7 |    0.9997 |   0.9990  |  0.9993  |   19244 |
+|           8 |    0.9035 |   0.3705  |  0.5255  |     278 |
+|           9 |    1.0000 |   0.2500  |  0.4000  |       4 |
+|          10 |    0.9718 |   0.9852  |  0.9785  |     876 |
+|          11 |    0.8888 |   0.9879  |  0.9357  |     825 |
+|          12 |    0.9812 |   0.9914  |  0.9863  |   34607 |
+|          13 |    0.9852 |   0.9798  |  0.9825  |    1635 |
+|          14 |    1.0000 |   0.5000  |  0.6667  |       2 |
+| | | | | |
+|    accuracy  |           |          |  0.9953 |   424182 |
+|   macro avg  |   0.8404  |  0.6767  |  0.7095 |   424182 |
+| weighted avg |    0.9949 |   0.9953 |   0.9949 |   424182 |
+
+
 ## Latest Results from UNSW dataset
+
+My batch sampler
+
+```
+class StratifiedBatchSampler(torch.utils.data.Sampler):
+    def __init__(self, labels, batch_size = BATCH_SIZE):
+        self.labels = np.array(labels)
+        self.batch_size = batch_size
+        self.label_to_indices = defaultdict(list)
+
+        for idx, label in enumerate(self.labels):
+            self.label_to_indices[label].append(idx)
+
+        self.class_probs = {
+            label: len(indices) / len(labels)
+            for label, indices in self.label_to_indices.items()
+        }
+
+    def __iter__(self):
+        all_indices = []
+        num_classes = len(self.label_to_indices)
+
+        # Approximate how many of each class to sample per batch
+        per_batch = {
+            label: max(1, int(self.class_probs[label] * self.batch_size))
+            for label in self.label_to_indices
+        }
+
+        num_batches = len(self)
+        for _ in range(num_batches):
+            batch = []
+            for label, indices in self.label_to_indices.items():
+                selected = np.random.choice(indices, per_batch[label], replace=True)
+                batch.extend(selected)
+            np.random.shuffle(batch)
+            yield batch[:self.batch_size]  # trim excess if needed
+
+    def __len__(self):
+        return len(self.labels) // self.batch_size
+```
+
+#### What this does
+It ensures the presence of at least some of each minority class in each batch.  We can tailor how balanced the sample is via batch size--smaller batches will be more balanced.
 
 ### Ran with 1024 batch size and my new batch sampler
 
