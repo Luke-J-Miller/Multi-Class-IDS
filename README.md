@@ -1,6 +1,19 @@
 # Multi-Class-IDS
 
-# A simple instantiation of the quantum layer
+## An observation that applies to both datasets
+As an example, using CICIDS dataset. The large validation sets are murdering us.  We have 11 samples of class 14 and we're locking away more than half from training.  Might be smart to do away with the validation set, or to severely limit its size.
+
+![image](https://github.com/user-attachments/assets/90a5b5ca-253f-49d5-a885-2a40fa7b7e87)
+
+![image](https://github.com/user-attachments/assets/4a385277-cae7-461a-9e7b-c2b691e825ce)
+
+![image](https://github.com/user-attachments/assets/294ea580-580a-4cf9-a48d-e5c48faca999)
+
+![image](https://github.com/user-attachments/assets/1eb9086b-4519-416c-8abc-49656ab335aa)
+
+
+
+## A simple instantiation of the quantum layer
 
 ```
 class CosineQuantumLayer(nn.Module):
