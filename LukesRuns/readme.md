@@ -50,8 +50,14 @@ class HybridSideBySideFastNN(nn.Module):
 ```
 
 
-This instantiates this quantum circuit
+This instantiates this quantum circuit  
+  
 ![image](https://github.com/user-attachments/assets/2da1c347-b594-45d0-8bef-a79b018b8d98)
+
+
+This network looks like this
+
+![image](https://github.com/user-attachments/assets/1565c940-4df9-4569-bb4f-e5f1a6a66836)
 
 
 and it gives us these results.
@@ -271,4 +277,3 @@ The current class labels can be grouped based on the **Cyber Kill Chain** to ref
   - Hierarchical prediction
   - Cost-sensitive loss tied to group similarity
   - Logit-space analysis for class neighborhoods
-
